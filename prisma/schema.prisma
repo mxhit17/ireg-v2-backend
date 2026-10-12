@@ -1,0 +1,428 @@
+generator client {
+  provider        = "prisma-client"
+  output          = "../src/generated/prisma"
+  previewFeatures = ["partialIndexes"]
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model blogs {
+  id              String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  author_id       String         @db.Uuid
+  title           String         @db.VarChar(300)
+  slug            String         @unique @db.VarChar(330)
+  excerpt         String?
+  body            String
+  cover_image_url String?
+  source_name     String?        @db.VarChar(200)
+  source_url      String?
+  status          content_status @default(DRAFT)
+  published_at    DateTime?      @db.Timestamptz(6)
+  created_at      DateTime       @default(now()) @db.Timestamptz(6)
+  updated_at      DateTime       @default(now()) @db.Timestamptz(6)
+  deleted_at      DateTime?      @db.Timestamptz(6)
+  users           users          @relation(fields: [author_id], references: [id], onUpdate: NoAction, map: "fk_blogs_author")
+
+  @@index([author_id], map: "idx_blogs_author")
+  @@index([status, published_at(sort: Desc)], map: "idx_blogs_status_published")
+}
+
+model builders {
+  id          String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name        String     @db.VarChar(200)
+  slug        String     @unique @db.VarChar(220)
+  description String?
+  logo_url    String?
+  website_url String?
+  created_at  DateTime   @default(now()) @db.Timestamptz(6)
+  updated_at  DateTime   @default(now()) @db.Timestamptz(6)
+  deleted_at  DateTime?  @db.Timestamptz(6)
+  projects    projects[]
+
+  @@index([name], map: "idx_builders_name")
+}
+
+model comment_reactions {
+  id            String                @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  comment_id    String                @db.Uuid
+  user_id       String                @db.Uuid
+  reaction_type comment_reaction_type
+  created_at    DateTime              @default(now()) @db.Timestamptz(6)
+  comments      comments              @relation(fields: [comment_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_comment_reactions_comment")
+  users         users                 @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_comment_reactions_user")
+
+  @@unique([comment_id, user_id], map: "uq_comment_user_reaction")
+  @@index([comment_id], map: "idx_comment_reactions_comment")
+  @@index([user_id], map: "idx_comment_reactions_user")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model comments {
+  id                String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  project_id        String              @db.Uuid
+  user_id           String              @db.Uuid
+  parent_comment_id String?             @db.Uuid
+  content           String
+  created_at        DateTime            @default(now()) @db.Timestamptz(6)
+  updated_at        DateTime            @default(now()) @db.Timestamptz(6)
+  deleted_at        DateTime?           @db.Timestamptz(6)
+  comment_reactions comment_reactions[]
+  comments          comments?           @relation("commentsTocomments", fields: [parent_comment_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_comments_parent")
+  other_comments    comments[]          @relation("commentsTocomments")
+  projects          projects            @relation(fields: [project_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_comments_project")
+  users             users               @relation(fields: [user_id], references: [id], onUpdate: NoAction, map: "fk_comments_user")
+
+  @@index([parent_comment_id, created_at], map: "idx_comments_parent")
+  @@index([project_id, created_at(sort: Desc)], map: "idx_comments_project")
+  @@index([user_id], map: "idx_comments_user")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model consultation_messages {
+  id              String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  consultation_id String        @db.Uuid
+  sender_id       String        @db.Uuid
+  message_type    message_type  @default(TEXT)
+  content         String?
+  attachment_url  String?
+  created_at      DateTime      @default(now()) @db.Timestamptz(6)
+  read_at         DateTime?     @db.Timestamptz(6)
+  deleted_at      DateTime?     @db.Timestamptz(6)
+  consultations   consultations @relation(fields: [consultation_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_consultation_messages_consultation")
+  users           users         @relation(fields: [sender_id], references: [id], onUpdate: NoAction, map: "fk_consultation_messages_sender")
+
+  @@index([consultation_id, created_at], map: "idx_consultation_messages_conversation")
+  @@index([sender_id], map: "idx_consultation_messages_sender")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model consultation_services {
+  id            String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name          String          @db.VarChar(200)
+  slug          String          @unique @db.VarChar(220)
+  description   String?
+  price         Decimal         @db.Decimal(12, 2)
+  currency      String          @default("INR") @db.Char(3)
+  duration_days Int             @default(7)
+  is_active     Boolean         @default(true)
+  created_at    DateTime        @default(now()) @db.Timestamptz(6)
+  updated_at    DateTime        @default(now()) @db.Timestamptz(6)
+  consultations consultations[]
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model consultations {
+  id                                 String                  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  user_id                            String                  @db.Uuid
+  service_id                         String                  @db.Uuid
+  sme_id                             String?                 @db.Uuid
+  status                             consultation_status     @default(PENDING_PAYMENT)
+  amount                             Decimal                 @db.Decimal(12, 2)
+  currency                           String                  @default("INR") @db.Char(3)
+  booked_at                          DateTime                @default(now()) @db.Timestamptz(6)
+  started_at                         DateTime?               @db.Timestamptz(6)
+  expires_at                         DateTime?               @db.Timestamptz(6)
+  completed_at                       DateTime?               @db.Timestamptz(6)
+  created_at                         DateTime                @default(now()) @db.Timestamptz(6)
+  updated_at                         DateTime                @default(now()) @db.Timestamptz(6)
+  consultation_messages              consultation_messages[]
+  consultation_services              consultation_services   @relation(fields: [service_id], references: [id], onUpdate: NoAction, map: "fk_consultations_service")
+  users_consultations_sme_idTousers  users?                  @relation("consultations_sme_idTousers", fields: [sme_id], references: [id], onDelete: Restrict, onUpdate: NoAction, map: "fk_consultations_sme")
+  users_consultations_user_idTousers users                   @relation("consultations_user_idTousers", fields: [user_id], references: [id], onUpdate: NoAction, map: "fk_consultations_user")
+
+  @@index([expires_at], map: "idx_consultations_expiry", where: raw("(status = ANY (ARRAY['PAID'::consultation_status, 'ASSIGNED'::consultation_status, 'ONGOING'::consultation_status]))"))
+  @@index([sme_id, status], map: "idx_consultations_sme")
+  @@index([status], map: "idx_consultations_status")
+  @@index([user_id, created_at(sort: Desc)], map: "idx_consultations_user")
+}
+
+model knowledge_categories {
+  id               String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name             String             @db.VarChar(200)
+  slug             String             @unique @db.VarChar(220)
+  description      String?
+  display_order    Int                @default(0)
+  created_at       DateTime           @default(now()) @db.Timestamptz(6)
+  updated_at       DateTime           @default(now()) @db.Timestamptz(6)
+  knowledge_topics knowledge_topics[]
+}
+
+model knowledge_tags {
+  id                   String                 @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name                 String                 @db.VarChar(100)
+  slug                 String                 @unique @db.VarChar(120)
+  created_at           DateTime               @default(now()) @db.Timestamptz(6)
+  knowledge_topic_tags knowledge_topic_tags[]
+}
+
+model knowledge_topic_tags {
+  topic_id         String           @db.Uuid
+  tag_id           String           @db.Uuid
+  knowledge_tags   knowledge_tags   @relation(fields: [tag_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_knowledge_topic_tags_tag")
+  knowledge_topics knowledge_topics @relation(fields: [topic_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_knowledge_topic_tags_topic")
+
+  @@id([topic_id, tag_id])
+  @@index([tag_id], map: "idx_knowledge_topic_tags_tag")
+}
+
+model knowledge_topics {
+  id                   String                 @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  category_id          String                 @db.Uuid
+  title                String                 @db.VarChar(250)
+  slug                 String                 @db.VarChar(280)
+  level                knowledge_level
+  definition           String
+  simple_explanation   String?
+  status               content_status         @default(DRAFT)
+  created_at           DateTime               @default(now()) @db.Timestamptz(6)
+  updated_at           DateTime               @default(now()) @db.Timestamptz(6)
+  knowledge_topic_tags knowledge_topic_tags[]
+  knowledge_categories knowledge_categories   @relation(fields: [category_id], references: [id], onUpdate: NoAction, map: "fk_knowledge_topics_category")
+
+  @@unique([category_id, slug], map: "uq_knowledge_topics_category_slug")
+  @@index([category_id], map: "idx_knowledge_topics_category")
+  @@index([level], map: "idx_knowledge_topics_level")
+  @@index([status], map: "idx_knowledge_topics_status")
+}
+
+model notifications {
+  id          String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  user_id     String            @db.Uuid
+  type        notification_type
+  title       String            @db.VarChar(250)
+  body        String?
+  entity_type String?           @db.VarChar(100)
+  entity_id   String?           @db.Uuid
+  is_read     Boolean           @default(false)
+  created_at  DateTime          @default(now()) @db.Timestamptz(6)
+  read_at     DateTime?         @db.Timestamptz(6)
+  users       users             @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_notifications_user")
+
+  @@index([user_id, created_at(sort: Desc)], map: "idx_notifications_unread", where: raw("(is_read = false)"))
+  @@index([user_id, created_at(sort: Desc)], map: "idx_notifications_user_created")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model project_images {
+  id                   String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  project_id           String   @db.Uuid
+  image_url            String
+  cloudinary_public_id String
+  display_order        Int      @default(0)
+  created_at           DateTime @default(now()) @db.Timestamptz(6)
+  projects             projects @relation(fields: [project_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_project_images_project")
+
+  @@index([project_id, display_order], map: "idx_project_images_project")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model project_ratings {
+  id                 String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  project_id         String            @db.Uuid
+  user_id            String            @db.Uuid
+  rating_category_id String            @db.Uuid
+  score              Decimal           @db.Decimal(2, 1)
+  created_at         DateTime          @default(now()) @db.Timestamptz(6)
+  updated_at         DateTime          @default(now()) @db.Timestamptz(6)
+  rating_categories  rating_categories @relation(fields: [rating_category_id], references: [id], onUpdate: NoAction, map: "fk_project_ratings_category")
+  projects           projects          @relation(fields: [project_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_project_ratings_project")
+  users              users             @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_project_ratings_user")
+
+  @@unique([project_id, user_id, rating_category_id], map: "uq_project_user_rating_category")
+  @@index([rating_category_id], map: "idx_project_ratings_category")
+  @@index([project_id], map: "idx_project_ratings_project")
+  @@index([user_id], map: "idx_project_ratings_user")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model projects {
+  id              String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  builder_id      String            @db.Uuid
+  name            String            @db.VarChar(250)
+  slug            String            @db.VarChar(280)
+  description     String?
+  project_type    project_type      @default(OTHER)
+  status          project_status    @default(UNKNOWN)
+  location        String?
+  locality        String?           @db.VarChar(150)
+  city            String?           @db.VarChar(150)
+  state           String?           @db.VarChar(150)
+  country         String?           @default("India") @db.VarChar(100)
+  latitude        Decimal?          @db.Decimal(10, 7)
+  longitude       Decimal?          @db.Decimal(10, 7)
+  min_price       Decimal?          @db.Decimal(15, 2)
+  max_price       Decimal?          @db.Decimal(15, 2)
+  currency        String            @default("INR") @db.Char(3)
+  created_at      DateTime          @default(now()) @db.Timestamptz(6)
+  updated_at      DateTime          @default(now()) @db.Timestamptz(6)
+  deleted_at      DateTime?         @db.Timestamptz(6)
+  comments        comments[]
+  project_images  project_images[]
+  project_ratings project_ratings[]
+  builders        builders          @relation(fields: [builder_id], references: [id], onUpdate: NoAction, map: "fk_projects_builder")
+  saved_projects  saved_projects[]
+
+  @@unique([builder_id, slug], map: "uq_projects_builder_slug", where: raw("(deleted_at IS NULL)"))
+  @@index([builder_id], map: "idx_projects_builder")
+  @@index([city], map: "idx_projects_city")
+  @@index([locality], map: "idx_projects_locality")
+  @@index([status], map: "idx_projects_status")
+  @@index([project_type], map: "idx_projects_type")
+}
+
+model rating_categories {
+  id              String               @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  code            rating_category_code @unique
+  name            String               @db.VarChar(100)
+  description     String?
+  display_order   Int                  @default(0) @db.SmallInt
+  is_active       Boolean              @default(true)
+  created_at      DateTime             @default(now()) @db.Timestamptz(6)
+  project_ratings project_ratings[]
+}
+
+model roles {
+  id         String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name       String       @unique @db.VarChar(50)
+  created_at DateTime     @default(now()) @db.Timestamptz(6)
+  user_roles user_roles[]
+}
+
+model saved_projects {
+  user_id    String   @db.Uuid
+  project_id String   @db.Uuid
+  created_at DateTime @default(now()) @db.Timestamptz(6)
+  projects   projects @relation(fields: [project_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_saved_projects_project")
+  users      users    @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_saved_projects_user")
+
+  @@id([user_id, project_id])
+  @@index([project_id], map: "idx_saved_projects_project")
+  @@index([user_id, created_at(sort: Desc)], map: "idx_saved_projects_user_created")
+}
+
+model user_roles {
+  user_id    String   @db.Uuid
+  role_id    String   @db.Uuid
+  created_at DateTime @default(now()) @db.Timestamptz(6)
+  roles      roles    @relation(fields: [role_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_user_roles_role")
+  users      users    @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_user_roles_user")
+
+  @@id([user_id, role_id])
+}
+
+/// This model contains an expression index which requires additional setup for migrations. Visit https://pris.ly/d/expression-indexes for more info.
+model users {
+  id                                         String                  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  email                                      String                  @db.VarChar(320)
+  password_hash                              String
+  name                                       String                  @db.VarChar(150)
+  phone                                      String?                 @db.VarChar(30)
+  profile_image_url                          String?
+  is_verified                                Boolean                 @default(false)
+  status                                     user_status             @default(ACTIVE)
+  created_at                                 DateTime                @default(now()) @db.Timestamptz(6)
+  updated_at                                 DateTime                @default(now()) @db.Timestamptz(6)
+  deleted_at                                 DateTime?               @db.Timestamptz(6)
+  blogs                                      blogs[]
+  comment_reactions                          comment_reactions[]
+  comments                                   comments[]
+  consultation_messages                      consultation_messages[]
+  consultations_consultations_sme_idTousers  consultations[]         @relation("consultations_sme_idTousers")
+  consultations_consultations_user_idTousers consultations[]         @relation("consultations_user_idTousers")
+  notifications                              notifications[]
+  project_ratings                            project_ratings[]
+  saved_projects                             saved_projects[]
+  user_roles                                 user_roles[]
+}
+
+model pending_registrations {
+  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  email         String   @unique @db.VarChar(320)
+  name          String   @db.VarChar(150)
+  password_hash String
+  otp_hash      String
+  expires_at    DateTime @db.Timestamptz(6)
+  attempts      Int      @default(0)
+  created_at    DateTime @default(now()) @db.Timestamptz(6)
+  updated_at    DateTime @default(now()) @db.Timestamptz(6)
+
+  @@index([expires_at], map: "idx_pending_registrations_expires_at")
+}
+
+enum comment_reaction_type {
+  LIKE
+  DISLIKE
+}
+
+enum consultation_status {
+  PENDING_PAYMENT
+  PAID
+  ASSIGNED
+  ONGOING
+  COMPLETED
+  CANCELLED
+  EXPIRED
+  REFUNDED
+}
+
+enum content_status {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+enum knowledge_level {
+  BEGINNER
+  INTERMEDIATE
+  PROFESSIONAL
+}
+
+enum message_type {
+  TEXT
+  IMAGE
+  DOCUMENT
+  SYSTEM
+}
+
+enum notification_type {
+  COMMENT_REPLY
+  COMMENT_REACTION
+  CONSULTATION_MESSAGE
+  CONSULTATION_ASSIGNED
+  CONSULTATION_STATUS
+  SYSTEM
+}
+
+enum project_status {
+  UPCOMING
+  ONGOING
+  COMPLETED
+  SOLD_OUT
+  UNKNOWN
+}
+
+enum project_type {
+  APARTMENT
+  VILLA
+  PLOT
+  BUILDER_FLOOR
+  COMMERCIAL
+  TOWNSHIP
+  OTHER
+}
+
+enum rating_category_code {
+  LOCATION_CONNECTIVITY
+  AMENITIES_FACILITIES
+  SURROUNDING_ENVIRONMENT
+  CONSTRUCTION_QUALITY
+  BUILDER
+}
+
+enum user_status {
+  ACTIVE
+  SUSPENDED
+  DEACTIVATED
+}
