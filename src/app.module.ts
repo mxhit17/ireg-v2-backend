@@ -6,6 +6,8 @@ import { ConfigModule } from '@nestjs/config';
 import { AuthModule } from './auth/auth.module';
 import { MailModule } from './mail/mail.module';
 import { UserAndAdminManagementModule } from './user-and-admin-management/user-and-admin-management.module';
+import { BuildersController } from './builders/builders.controller';
+import { BuildersModule } from './builders/builders.module';
 
 @Module({
   imports: [
@@ -15,9 +17,10 @@ import { UserAndAdminManagementModule } from './user-and-admin-management/user-a
     PrismaModule,
     AuthModule,
     MailModule,
-    UserAndAdminManagementModule
+    UserAndAdminManagementModule,
+    BuildersModule
   ],
-  controllers: [AppController],
+  controllers: [AppController, BuildersController],
   providers: [AppService],
 })
 export class AppModule {}

@@ -4,12 +4,15 @@ import {
   Get,
   Patch,
   Req,
+  UploadedFile,
   UseGuards,
+  UseInterceptors,
 } from '@nestjs/common';
 import { Request } from 'express';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { UserAndAdminManagementService } from './user-and-admin-management.service';
 import { UpdateProfileDto } from './dto/update-profile.dto';
+import { FileInterceptor } from '@nestjs/platform-express';
 
 interface AuthenticatedRequest extends Request {
   user: {
@@ -42,6 +45,19 @@ export class UserAndAdminManagementController {
     return this.userAndAdminManagementService.updateProfile(
       req.user.id,
       dto,
+    );
+  }
+
+  @Patch('profile/photo')
+  @UseGuards(JwtAuthGuard)
+  @UseInterceptors(FileInterceptor('file'))
+  updateProfilePhoto(
+    @Req() req: AuthenticatedRequest,
+    @UploadedFile() file: Express.Multer.File,
+  ) {
+    return this.userAndAdminManagementService.updateProfilePhoto(
+      req.user.id,
+      file,
     );
   }
 }
