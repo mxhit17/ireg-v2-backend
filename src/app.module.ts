@@ -8,6 +8,8 @@ import { MailModule } from './mail/mail.module';
 import { UserAndAdminManagementModule } from './user-and-admin-management/user-and-admin-management.module';
 import { BuildersController } from './builders/builders.controller';
 import { BuildersModule } from './builders/builders.module';
+import { ProjectsController } from './projects/projects.controller';
+import { ProjectsModule } from './projects/projects.module';
 
 @Module({
   imports: [
@@ -18,9 +20,10 @@ import { BuildersModule } from './builders/builders.module';
     AuthModule,
     MailModule,
     UserAndAdminManagementModule,
-    BuildersModule
+    BuildersModule,
+    ProjectsModule
   ],
-  controllers: [AppController, BuildersController],
+  controllers: [AppController],
   providers: [AppService],
 })
 export class AppModule {}

@@ -1,5 +1,6 @@
 
 import {
+  BadRequestException,
   ConflictException,
   Injectable,
   NotFoundException,
@@ -8,6 +9,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { CreateBuilderDto } from './dto/create-builder.dto';
 import { PaginationDto } from 'src/common/pagination/pagination.dto';
 import { paginate } from 'src/common/pagination/pagination.util';
+import { UpdateBuilderDto } from './dto/update-builder.dto';
 
 @Injectable()
 export class BuildersService {
@@ -105,33 +107,73 @@ export class BuildersService {
     });
   }
 
-async getBuilderById(id: string) {
-  const builder = await this.prisma.builders.findFirst({
-    where: {
-      id,
-      deleted_at: null,
-    },
-  });
-
-  if (!builder) {
-    throw new NotFoundException(
-      'Builder not found.',
-    );
-  }
-
-  return builder;
-}
-
-async deleteBuilder(id: string) {
-  return this.prisma.$transaction(async (tx) => {
-    const builder = await tx.builders.findFirst({
+  async getBuilderById(id: string) {
+    const builder = await this.prisma.builders.findFirst({
       where: {
         id,
         deleted_at: null,
       },
-      select: {
-        id: true,
-        name: true,
+    });
+
+    if (!builder) {
+      throw new NotFoundException(
+        'Builder not found.',
+      );
+    }
+
+    return builder;
+  }
+
+  async deleteBuilder(id: string) {
+    return this.prisma.$transaction(async (tx) => {
+      const builder = await tx.builders.findFirst({
+        where: {
+          id,
+          deleted_at: null,
+        },
+        select: {
+          id: true,
+          name: true,
+        },
+      });
+
+      if (!builder) {
+        throw new NotFoundException('Builder not found.');
+      }
+
+      const projectCount = await tx.projects.count({
+        where: {
+          builder_id: id,
+        },
+      });
+
+      if (projectCount > 0) {
+        throw new ConflictException(
+          `Cannot delete builder because ${projectCount} project(s) are associated with it.`,
+        );
+      }
+
+      await tx.builders.update({
+        where: {
+          id,
+        },
+        data: {
+          deleted_at: new Date(),
+        },
+      });
+
+      return {
+        message: 'Builder deleted successfully.',
+        id: builder.id,
+      };
+    });
+  }
+
+  async updateBuilder(id: string, dto: UpdateBuilderDto) {
+    const builder = await this.prisma.builders.findFirst({
+      where: {
+        id,
+        deleted_at: null,
       },
     });
 
@@ -139,32 +181,98 @@ async deleteBuilder(id: string) {
       throw new NotFoundException('Builder not found.');
     }
 
-    const projectCount = await tx.projects.count({
-      where: {
-        builder_id: id,
-      },
-    });
+    const data: {
+      name?: string;
+      slug?: string;
+      description?: string | null;
+      website_url?: string | null;
+    } = {};
 
-    if (projectCount > 0) {
-      throw new ConflictException(
-        `Cannot delete builder because ${projectCount} project(s) are associated with it.`,
+    // Update name and regenerate slug only when the name changes.
+    if (dto.name !== undefined) {
+      const name = dto.name.trim();
+
+      if (!name) {
+        throw new BadRequestException(
+          'Builder name cannot be empty.',
+        );
+      }
+
+      if (name !== builder.name) {
+        const existingBuilder =
+          await this.prisma.builders.findFirst({
+            where: {
+              name: {
+                equals: name,
+                mode: 'insensitive',
+              },
+              deleted_at: null,
+              id: { not: id },
+            },
+            select: { id: true },
+          });
+
+        if (existingBuilder) {
+          throw new ConflictException(
+            'A builder with this name already exists.',
+          );
+        }
+
+        const baseSlug = this.generateSlug(name);
+
+        if (!baseSlug) {
+          throw new BadRequestException(
+            'Builder name cannot be converted into a valid slug.',
+          );
+        }
+
+        // Check all records, including soft-deleted builders.
+        let slug = baseSlug;
+        let suffix = 1;
+
+        while (true) {
+          const existingSlug =
+            await this.prisma.builders.findUnique({
+              where: { slug },
+              select: { id: true },
+            });
+
+          if (!existingSlug || existingSlug.id === id) {
+            break;
+          }
+
+          const suffixText = `-${suffix++}`;
+          slug = `${baseSlug.slice(0, 220 - suffixText.length)}${suffixText}`;
+        }
+
+        data.name = name;
+        data.slug = slug;
+      }
+    }
+
+    if (dto.description !== undefined) {
+      data.description =
+        typeof dto.description === 'string'
+          ? dto.description.trim() || null
+          : null;
+    }
+
+    if (dto.website_url !== undefined) {
+      data.website_url =
+        typeof dto.website_url === 'string'
+          ? dto.website_url.trim() || null
+          : null;
+    }
+
+    if (Object.keys(data).length === 0) {
+      throw new BadRequestException(
+        'At least one valid field must be provided for update.',
       );
     }
 
-    await tx.builders.update({
-      where: {
-        id,
-      },
-      data: {
-        deleted_at: new Date(),
-      },
+    return this.prisma.builders.update({
+      where: { id },
+      data,
     });
-
-    return {
-      message: 'Builder deleted successfully.',
-      id: builder.id,
-    };
-  });
-}
-
+  }
 }
