@@ -13,6 +13,7 @@ import {
   Patch,
   Post,
   Query,
+  Req,
   UploadedFile,
   UseGuards,
   UseInterceptors,
@@ -28,6 +29,18 @@ import { PaginationDto } from 'src/common/pagination/pagination.dto';
 import { UpdateProjectDto } from './dto/update-project.dto';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { CreateProjectImageDto } from './dto/create-project-image.dto';
+import { GetProjectsDto } from './dto/get-project.dto';
+import { RateProjectDto } from './dto/rate-project.dto';
+import { CreateProjectCommentDto } from './dto/create-project-comment.dto';
+import { GetProjectCommentsDto } from './dto/get-project-comments.dto';
+
+interface AuthenticatedRequest extends Request {
+  user: {
+    id: string;
+    email: string;
+    roles: string[];
+  };
+}
 
 @Controller('projects')
 export class ProjectsController {
@@ -43,14 +56,25 @@ export class ProjectsController {
     return this.projectsService.createProject(dto);
   }
 
-  // GET /projects?page=1&limit=20
-  @Get()
-  @HttpCode(HttpStatus.OK)
-  getAllProjects(@Query() query: PaginationDto) {
-    return this.projectsService.getAllProjects(query);
-  }
+  // // GET /projects?page=1&limit=20
+  // @Get()
+  // @HttpCode(HttpStatus.OK)
+  // getAllProjects(@Query() query: PaginationDto) {
+  //   return this.projectsService.getAllProjects(query);
+  // }
 
   // GET /projects/:id
+  @Post(':id/ratings')
+  @UseGuards(JwtAuthGuard)
+  @HttpCode(HttpStatus.OK)
+  rateProject(
+    @Param('id', new ParseUUIDPipe()) id: string,
+    @Body() dto: RateProjectDto,
+    @Req() request: AuthenticatedRequest,
+  ) {
+    return this.projectsService.rateProject(id, request.user.id, dto);
+  }
+
   @Get(':id')
   @HttpCode(HttpStatus.OK)
   getProjectById(
@@ -71,85 +95,139 @@ export class ProjectsController {
   }
 
   @Patch(':id')
-@UseGuards(JwtAuthGuard, RolesGuard)
-@Roles(Role.ADMIN)
-@HttpCode(HttpStatus.OK)
-updateProject(
-  @Param('id', new ParseUUIDPipe()) id: string,
-  @Body() dto: UpdateProjectDto,
-) {
-  return this.projectsService.updateProject(id, dto);
-}
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.ADMIN)
+  @HttpCode(HttpStatus.OK)
+  updateProject(
+    @Param('id', new ParseUUIDPipe()) id: string,
+    @Body() dto: UpdateProjectDto,
+  ) {
+    return this.projectsService.updateProject(id, dto);
+  }
 
-@Post(':projectId/images')
-@UseGuards(JwtAuthGuard, RolesGuard)
-@Roles(Role.ADMIN)
-@UseInterceptors(FileInterceptor('file'))
-@HttpCode(HttpStatus.CREATED)
-addProjectImage(
-  @Param('projectId', new ParseUUIDPipe())
-  projectId: string,
+  @Post(':projectId/images')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.ADMIN)
+  @UseInterceptors(FileInterceptor('file'))
+  @HttpCode(HttpStatus.CREATED)
+  addProjectImage(
+    @Param('projectId', new ParseUUIDPipe())
+    projectId: string,
 
-  @UploadedFile(
-    new ParseFilePipe({
-      validators: [
-        new MaxFileSizeValidator({
-          maxSize: 5 * 1024 * 1024, // 5 MB
-        }),
-        new FileTypeValidator({
-          fileType: /^image\/(jpeg|png|webp)$/,
-        }),
-      ],
-    }),
-  )
-  file: Express.Multer.File,
+    @UploadedFile(
+      new ParseFilePipe({
+        validators: [
+          new MaxFileSizeValidator({
+            maxSize: 5 * 1024 * 1024, // 5 MB
+          }),
+          new FileTypeValidator({
+            fileType: /^image\/(jpeg|png|webp)$/,
+          }),
+        ],
+      }),
+    )
+    file: Express.Multer.File,
 
-  @Body() dto: CreateProjectImageDto,
-) {
-  return this.projectsService.addProjectImage(
-    projectId,
-    file,
-    dto,
-  );
-}
+    @Body() dto: CreateProjectImageDto,
+  ) {
+    return this.projectsService.addProjectImage(
+      projectId,
+      file,
+      dto,
+    );
+  }
 
-@Patch(':projectId/images')
-@UseGuards(JwtAuthGuard, RolesGuard)
-@Roles(Role.ADMIN)
-@UseInterceptors(FileInterceptor('file'))
-@HttpCode(HttpStatus.OK)
-replaceProjectImage(
-  @Param('projectId', new ParseUUIDPipe())
-  projectId: string,
+  @Patch(':projectId/images')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.ADMIN)
+  @UseInterceptors(FileInterceptor('file'))
+  @HttpCode(HttpStatus.OK)
+  replaceProjectImage(
+    @Param('projectId', new ParseUUIDPipe())
+    projectId: string,
 
-  @UploadedFile(
-    new ParseFilePipe({
-      validators: [
-        new MaxFileSizeValidator({
-          maxSize: 5 * 1024 * 1024,
-        }),
-        new FileTypeValidator({
-          fileType: /^image\/(jpeg|png|webp)$/,
-        }),
-      ],
-    }),
-  )
-  file: Express.Multer.File,
-) {
-  return this.projectsService.replaceProjectImage(
-    projectId,
-    file,
-  );
-}
+    @UploadedFile(
+      new ParseFilePipe({
+        validators: [
+          new MaxFileSizeValidator({
+            maxSize: 5 * 1024 * 1024,
+          }),
+          new FileTypeValidator({
+            fileType: /^image\/(jpeg|png|webp)$/,
+          }),
+        ],
+      }),
+    )
+    file: Express.Multer.File,
+  ) {
+    return this.projectsService.replaceProjectImage(
+      projectId,
+      file,
+    );
+  }
 
-@Delete(':projectId/images')
-@UseGuards(JwtAuthGuard, RolesGuard)
-@Roles(Role.ADMIN)
-@HttpCode(HttpStatus.OK)
-deleteProjectImage(
-  @Param('projectId', new ParseUUIDPipe())
-  projectId: string,
-) {
-  return this.projectsService.deleteProjectImage(projectId);
-}
+  @Delete(':projectId/images')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.ADMIN)
+  @HttpCode(HttpStatus.OK)
+  deleteProjectImage(
+    @Param('projectId', new ParseUUIDPipe())
+    projectId: string,
+  ) {
+    return this.projectsService.deleteProjectImage(projectId);
+  }
+
+  // This api can replace getAllProjects Api just dont pass any parameters
+  @Get()
+  getProjects(@Query() query: GetProjectsDto) {
+    return this.projectsService.getProjects(query);
+  }
+
+  @Get(':projectId/ratings')
+  async getProjectRatings(
+    @Param('projectId', ParseUUIDPipe)
+    projectId: string,
+  ) {
+    return this.projectsService.getProjectRatings(
+      projectId,
+    );
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Get(':projectId/my-rating')
+  async getMyProjectRatings(
+    @Param('projectId', ParseUUIDPipe)
+    projectId: string,
+    @Req() req: AuthenticatedRequest,
+  ) {
+    return this.projectsService.getMyProjectRatings(
+      projectId,
+      req.user.id,
+    );
+  }
+
+  @Post(':projectId/comments')
+  @UseGuards(JwtAuthGuard)
+  async createProjectComment(
+    @Param('projectId', ParseUUIDPipe) projectId: string,
+    @Body() dto: CreateProjectCommentDto,
+    @Req() req: AuthenticatedRequest,
+  ) {
+    return this.projectsService.createProjectComment(
+      projectId,
+      req.user.id,
+      dto,
+    );
+  }
+
+  @Get(':projectId/comments')
+  async getProjectComments(
+    @Param('projectId', ParseUUIDPipe) projectId: string,
+    @Query() query: GetProjectCommentsDto,
+  ) {
+    return this.projectsService.getProjectComments(
+      projectId,
+      query,
+    );
+  }
 }
