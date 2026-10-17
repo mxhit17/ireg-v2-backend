@@ -10,6 +10,8 @@ import { BuildersController } from './builders/builders.controller';
 import { BuildersModule } from './builders/builders.module';
 import { ProjectsController } from './projects/projects.controller';
 import { ProjectsModule } from './projects/projects.module';
+import { CommentsController } from './comments/comments.controller';
+import { CommentsModule } from './comments/comments.module';
 
 @Module({
   imports: [
@@ -21,7 +23,8 @@ import { ProjectsModule } from './projects/projects.module';
     MailModule,
     UserAndAdminManagementModule,
     BuildersModule,
-    ProjectsModule
+    ProjectsModule,
+    CommentsModule
   ],
   controllers: [AppController],
   providers: [AppService],

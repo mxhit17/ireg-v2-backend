@@ -1225,4 +1225,59 @@ export class ProjectsService {
       },
     };
   }
+
+  async saveProject(userId: string, projectId: string) {
+    // 1. Check whether the project exists
+    const project = await this.prisma.projects.findUnique({
+      where: { id: projectId },
+      select: { id: true },
+    });
+
+    if (!project) {
+      throw new NotFoundException('Project not found');
+    }
+
+    // 2. Save the project without creating duplicates
+    await this.prisma.saved_projects.upsert({
+      where: {
+        user_id_project_id: {
+          user_id: userId,
+          project_id: projectId,
+        },
+      },
+      create: {
+        user_id: userId,
+        project_id: projectId,
+      },
+      update: {},
+    });
+
+    // 3. Return response
+    return {
+      message: 'Project saved successfully',
+      data: {
+        project_id: projectId,
+        saved: true,
+      },
+    };
+  }
+
+  async unsaveProject(userId: string, projectId: string) {
+    const result = await this.prisma.saved_projects.deleteMany({
+      where: {
+        user_id: userId,
+        project_id: projectId,
+      },
+    });
+
+    return {
+      message: result.count > 0
+        ? 'Project unsaved successfully'
+        : 'Project was not saved',
+      data: {
+        project_id: projectId,
+        saved: false,
+      },
+    };
+  }
 }

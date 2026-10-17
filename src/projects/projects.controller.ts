@@ -12,6 +12,7 @@ import {
   ParseUUIDPipe,
   Patch,
   Post,
+  Put,
   Query,
   Req,
   UploadedFile,
@@ -228,6 +229,30 @@ export class ProjectsController {
     return this.projectsService.getProjectComments(
       projectId,
       query,
+    );
+  }
+
+  @Put(':id/save')
+  @UseGuards(JwtAuthGuard)
+  async saveProject(
+    @Param('id', ParseUUIDPipe) projectId: string,
+    @Req() req: AuthenticatedRequest,
+  ) {
+    return this.projectsService.saveProject(
+      req.user.id,
+      projectId,
+    );
+  }
+
+  @Delete(':id/save')
+  @UseGuards(JwtAuthGuard)
+  async unsaveProject(
+    @Param('id', ParseUUIDPipe) projectId: string,
+    @Req() req: AuthenticatedRequest,
+  ) {
+    return this.projectsService.unsaveProject(
+      req.user.id,
+      projectId,
     );
   }
 }
