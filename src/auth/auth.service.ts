@@ -48,8 +48,12 @@ export class AuthService {
   }
 
   async register(dto: RegisterDto) {
+    console.log('[REGISTER] Started');
+
     const email = this.normalizeEmail(dto.email);
 
+  console.log('[REGISTER] Checking existing user');
+  
     const existingUser = await this.prisma.users.findFirst({
       where: {
         email,
@@ -63,6 +67,9 @@ export class AuthService {
         'An account with this email already exists',
       );
     }
+    // Your existing Prisma query
+  console.log('[REGISTER] Existing user check completed');
+
 
     // Hash the password before temporarily storing it.
     const passwordHash = await bcrypt.hash(dto.password, 12);
@@ -74,7 +81,7 @@ export class AuthService {
     const expiresAt = new Date(
       Date.now() + this.otpExpiryMinutes * 60 * 1000,
     );
-
+console.log('[REGISTER] Saving pending registration');
     // Replace any previous pending registration for this email.
     await this.prisma.pending_registrations.upsert({
       where: { email },
@@ -95,8 +102,17 @@ export class AuthService {
       },
     });
 
+  
+  // Your existing Prisma upsert/create
+  console.log('[REGISTER] Pending registration saved');
+
+  console.log('[REGISTER] Sending OTP email');
+  // Your existing mailService.sendOtpEmail(...) call
+  
+
     try {
       await this.mailService.sendOtpEmail(email, otp);
+      console.log('[REGISTER] OTP email sent');
     } catch {
       // Do not leave an apparently valid registration behind
       // if the email could not be sent.
