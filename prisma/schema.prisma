@@ -238,31 +238,33 @@ model project_ratings {
 
 /// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
 model projects {
-  id              String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  builder_id      String            @db.Uuid
-  name            String            @db.VarChar(250)
-  slug            String            @db.VarChar(280)
-  description     String?
-  project_type    project_type      @default(OTHER)
-  status          project_status    @default(UNKNOWN)
-  location        String?
-  locality        String?           @db.VarChar(150)
-  city            String?           @db.VarChar(150)
-  state           String?           @db.VarChar(150)
-  country         String?           @default("India") @db.VarChar(100)
-  latitude        Decimal?          @db.Decimal(10, 7)
-  longitude       Decimal?          @db.Decimal(10, 7)
-  min_price       Decimal?          @db.Decimal(15, 2)
-  max_price       Decimal?          @db.Decimal(15, 2)
-  currency        String            @default("INR") @db.Char(3)
-  created_at      DateTime          @default(now()) @db.Timestamptz(6)
-  updated_at      DateTime          @default(now()) @db.Timestamptz(6)
-  deleted_at      DateTime?         @db.Timestamptz(6)
-  comments        comments[]
-  project_images  project_images[]
-  project_ratings project_ratings[]
-  builders        builders          @relation(fields: [builder_id], references: [id], onUpdate: NoAction, map: "fk_projects_builder")
-  saved_projects  saved_projects[]
+  id                  String                @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  builder_id          String                @db.Uuid
+  name                String                @db.VarChar(250)
+  slug                String                @db.VarChar(280)
+  description         String?
+  project_type        project_type          @default(OTHER)
+  status              project_status        @default(UNKNOWN)
+  location            String?
+  locality            String?               @db.VarChar(150)
+  city                String?               @db.VarChar(150)
+  state               String?               @db.VarChar(150)
+  country             String?               @default("India") @db.VarChar(100)
+  latitude            Decimal?              @db.Decimal(10, 7)
+  longitude           Decimal?              @db.Decimal(10, 7)
+  min_price           Decimal?              @db.Decimal(15, 2)
+  max_price           Decimal?              @db.Decimal(15, 2)
+  currency            String                @default("INR") @db.Char(3)
+  created_at          DateTime              @default(now()) @db.Timestamptz(6)
+  updated_at          DateTime              @default(now()) @db.Timestamptz(6)
+  deleted_at          DateTime?             @db.Timestamptz(6)
+  comments            comments[]
+  project_images      project_images[]
+  project_ratings     project_ratings[]
+  project_stats       project_stats?
+  project_view_events project_view_events[]
+  builders            builders              @relation(fields: [builder_id], references: [id], onUpdate: NoAction, map: "fk_projects_builder")
+  saved_projects      saved_projects[]
 
   @@unique([builder_id, slug], map: "uq_projects_builder_slug", where: raw("(deleted_at IS NULL)"))
   @@index([builder_id], map: "idx_projects_builder")
@@ -334,6 +336,7 @@ model users {
   consultations_consultations_user_idTousers consultations[]         @relation("consultations_user_idTousers")
   notifications                              notifications[]
   project_ratings                            project_ratings[]
+  project_view_events                        project_view_events[]
   saved_projects                             saved_projects[]
   user_roles                                 user_roles[]
 }
@@ -350,6 +353,44 @@ model pending_registrations {
   updated_at    DateTime @default(now()) @db.Timestamptz(6)
 
   @@index([expires_at], map: "idx_pending_registrations_expires_at")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model project_stats {
+  project_id              String   @id @db.Uuid
+  views_30d               BigInt   @default(0)
+  unique_visitors_30d     BigInt   @default(0)
+  saves_30d               BigInt   @default(0)
+  comments_30d            BigInt   @default(0)
+  rating_activity_30d     BigInt   @default(0)
+  engagement_7d           Decimal  @default(0) @db.Decimal(14, 2)
+  views_score             Decimal  @default(0) @db.Decimal(5, 2)
+  unique_visitors_score   Decimal  @default(0) @db.Decimal(5, 2)
+  saves_score             Decimal  @default(0) @db.Decimal(5, 2)
+  comments_score          Decimal  @default(0) @db.Decimal(5, 2)
+  rating_activity_score   Decimal  @default(0) @db.Decimal(5, 2)
+  recent_engagement_score Decimal  @default(0) @db.Decimal(5, 2)
+  popularity_score        Decimal  @default(0) @db.Decimal(5, 2)
+  trending_score          Decimal  @default(0) @db.Decimal(5, 2)
+  calculated_at           DateTime @default(now()) @db.Timestamptz(6)
+  projects                projects @relation(fields: [project_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([popularity_score(sort: Desc), project_id], map: "idx_project_stats_popularity")
+  @@index([trending_score(sort: Desc), project_id], map: "idx_project_stats_trending")
+}
+
+model project_view_events {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  project_id String   @db.Uuid
+  user_id    String?  @db.Uuid
+  visitor_id String   @db.Uuid
+  viewed_at  DateTime @default(now()) @db.Timestamptz(6)
+  projects   projects @relation(fields: [project_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  users      users?   @relation(fields: [user_id], references: [id], onUpdate: NoAction)
+
+  @@index([project_id, viewed_at(sort: Desc)], map: "idx_project_view_events_project_time")
+  @@index([user_id, viewed_at(sort: Desc)], map: "idx_project_view_events_user_time", where: raw("(user_id IS NOT NULL)"))
+  @@index([visitor_id, viewed_at(sort: Desc)], map: "idx_project_view_events_visitor_time")
 }
 
 enum comment_reaction_type {

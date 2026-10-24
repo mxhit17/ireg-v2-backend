@@ -60,4 +60,14 @@ export class UserAndAdminManagementController {
       file,
     );
   }
+
+
+  @Get('users/me/saved-projects')
+  @UseGuards(JwtAuthGuard)
+  getSavedProjects(@Req() req: AuthenticatedRequest) {
+    return this.userAndAdminManagementService.getSavedProjects(
+      req.user.id,
+    );
+  }
+
 }

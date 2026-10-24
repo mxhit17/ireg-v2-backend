@@ -19,6 +19,7 @@ import { project_ratings } from 'src/generated/prisma/client';
 import { RateProjectDto } from './dto/rate-project.dto';
 import { CreateProjectCommentDto } from './dto/create-project-comment.dto';
 import { GetProjectCommentsDto } from './dto/get-project-comments.dto';
+import { SearchProjectsDto } from './dto/search-project.dto';
 @Injectable()
 export class ProjectsService {
   constructor(private readonly prisma: PrismaService, private readonly mediaService: MediaService) {}
@@ -1279,5 +1280,179 @@ export class ProjectsService {
         saved: false,
       },
     };
+  }
+
+  async searchProjects(dto: SearchProjectsDto) {
+    const {
+      q,
+      city,
+      state,
+      locality,
+      type,
+      status,
+      minPrice,
+      maxPrice,
+      page = 1,
+      limit = 20,
+    } = dto;
+
+    if (minPrice !== undefined &&
+        maxPrice !== undefined &&
+        minPrice > maxPrice) {
+      throw new BadRequestException(
+        'minPrice cannot be greater than maxPrice.',
+      );
+    }
+
+    const where: Prisma.projectsWhereInput = {
+      deleted_at: null,
+
+      ...(q?.trim() && {
+        OR: [
+          { name: { contains: q.trim(), mode: 'insensitive' } },
+          { slug: { contains: q.trim(), mode: 'insensitive' } },
+          { location: { contains: q.trim(), mode: 'insensitive' } },
+          { locality: { contains: q.trim(), mode: 'insensitive' } },
+          { city: { contains: q.trim(), mode: 'insensitive' } },
+          { state: { contains: q.trim(), mode: 'insensitive' } },
+        ],
+      }),
+
+      ...(city?.trim() && {
+        city: { equals: city.trim(), mode: 'insensitive' },
+      }),
+
+      ...(state?.trim() && {
+        state: { equals: state.trim(), mode: 'insensitive' },
+      }),
+
+      ...(locality?.trim() && {
+        locality: { equals: locality.trim(), mode: 'insensitive' },
+      }),
+
+      ...(type && { project_type: type }),
+
+      ...(status && { status }),
+
+      ...(minPrice !== undefined && {
+        max_price: { gte: new Prisma.Decimal(minPrice) },
+      }),
+
+      ...(maxPrice !== undefined && {
+        min_price: { lte: new Prisma.Decimal(maxPrice) },
+      }),
+    };
+
+    const skip = (page - 1) * limit;
+
+    const [projects, total] = await this.prisma.$transaction([
+      this.prisma.projects.findMany({
+        where,
+        orderBy: [
+          { created_at: 'desc' },
+          { id: 'desc' },
+        ],
+        skip,
+        take: limit,
+        select: {
+          id: true,
+          name: true,
+          slug: true,
+          description: true,
+          project_type: true,
+          status: true,
+          location: true,
+          locality: true,
+          city: true,
+          state: true,
+          country: true,
+          latitude: true,
+          longitude: true,
+          min_price: true,
+          max_price: true,
+          currency: true,
+          created_at: true,
+          project_images: {
+            select: {
+              id: true,
+              image_url: true,
+            },
+          },
+        },
+      }),
+
+      this.prisma.projects.count({ where }),
+    ]);
+
+    return {
+      success: true,
+      message: 'Projects fetched successfully',
+      data: projects,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+        hasNextPage: page * limit < total,
+        hasPreviousPage: page > 1,
+      },
+    };
+  }
+
+  // Situation	          userId	              visitorId
+  // Guest user	          null	                Persistent installation UUID
+  // Authenticated user	  Extracted from JWT	  Same persistent installation UUID
+  // User logs out	      null	                Keep the same UUID
+  // User logs in again	  Extracted from JWT	  Keep the same UUID
+  async recordProjectView(
+    projectId: string,
+    userId: string | null,
+    visitorId: string,
+  ): Promise<boolean> {
+    return this.prisma.$transaction(async (tx) => {
+      // Serialize simultaneous requests for this project/visitor pair.
+      await tx.$executeRaw`
+        SELECT pg_advisory_xact_lock(
+          hashtextextended(
+            ${projectId} || ':' || ${visitorId},
+            0
+          )
+        )
+      `;
+
+      const project = await tx.projects.findUnique({
+        where: { id: projectId },
+        select: { id: true },
+      });
+
+      if (!project) {
+        throw new NotFoundException('Project not found');
+      }
+
+      // Do not record another view within the last 30 minutes.
+      const inserted = await tx.$queryRaw<{ id: string }[]>`
+        INSERT INTO project_view_events (
+          project_id,
+          user_id,
+          visitor_id
+        )
+        SELECT
+          p.id,
+          ${userId}::uuid,
+          ${visitorId}::uuid
+        FROM projects p
+        WHERE p.id = ${projectId}::uuid
+          AND NOT EXISTS (
+            SELECT 1
+            FROM project_view_events e
+            WHERE e.project_id = p.id
+              AND e.visitor_id = ${visitorId}::uuid
+              AND e.viewed_at >= NOW() - INTERVAL '30 minutes'
+          )
+        RETURNING id
+      `;
+
+      return inserted.length > 0;
+    });
   }
 }

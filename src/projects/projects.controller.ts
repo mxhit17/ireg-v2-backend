@@ -34,6 +34,9 @@ import { GetProjectsDto } from './dto/get-project.dto';
 import { RateProjectDto } from './dto/rate-project.dto';
 import { CreateProjectCommentDto } from './dto/create-project-comment.dto';
 import { GetProjectCommentsDto } from './dto/get-project-comments.dto';
+import { SearchProjectsDto } from './dto/search-project.dto';
+import { OptionalJwtAuthGuard } from 'src/auth/guards/optional-jwt-auth.gaurd';
+import { RecordProjectViewDto } from './dto/record-project-view.dto';
 
 interface AuthenticatedRequest extends Request {
   user: {
@@ -74,6 +77,11 @@ export class ProjectsController {
     @Req() request: AuthenticatedRequest,
   ) {
     return this.projectsService.rateProject(id, request.user.id, dto);
+  }
+
+  @Get('search')
+  searchProjects(@Query() dto: SearchProjectsDto) {
+    return this.projectsService.searchProjects(dto);
   }
 
   @Get(':id')
@@ -254,5 +262,30 @@ export class ProjectsController {
       req.user.id,
       projectId,
     );
+  }
+
+  @Post(':id/view')
+  @UseGuards(OptionalJwtAuthGuard)
+  async recordProjectView(
+    @Param('id', ParseUUIDPipe) projectId: string,
+    @Body() dto: RecordProjectViewDto,
+    @Req() req: AuthenticatedRequest,
+  ) {
+    const userId = req.user?.id ?? null;
+
+    const recorded =
+      await this.projectsService.recordProjectView(
+        projectId,
+        userId,
+        dto.visitorId,
+      );
+
+    return {
+      success: true,
+      recorded,
+      message: recorded
+        ? 'Project view recorded'
+        : 'Project view already recorded recently',
+    };
   }
 }

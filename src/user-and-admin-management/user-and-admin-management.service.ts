@@ -241,4 +241,41 @@ export class UserAndAdminManagementService {
       throw error;
     }
   }
+
+  async getSavedProjects(userId: string) {
+    if (!userId) {
+      throw new UnauthorizedException('Invalid authentication');
+    }
+
+    const savedProjects = await this.prisma.saved_projects.findMany({
+      where: {
+        user_id: userId,
+      },
+      orderBy: {
+        created_at: 'desc',
+      },
+      select: {
+        created_at: true,
+        projects: {
+          select: {
+            id: true,
+            name: true,
+            slug: true,
+            description: true,
+            project_type: true,
+          },
+        },
+      },
+    });
+
+    return {
+      success: true,
+      message: 'Saved projects fetched successfully',
+      data: savedProjects.map((saved) => ({
+        ...saved.projects,
+        saved_at: saved.created_at,
+      })),
+      count: savedProjects.length,
+    };
+  }
 }

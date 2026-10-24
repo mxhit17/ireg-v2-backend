@@ -12,9 +12,13 @@ import { ProjectsController } from './projects/projects.controller';
 import { ProjectsModule } from './projects/projects.module';
 import { CommentsController } from './comments/comments.controller';
 import { CommentsModule } from './comments/comments.module';
+import { ScheduleModule } from '@nestjs/schedule';
+import { PopularityModule } from './popularity/popularity.module';
+import { HomeModule } from './home/home.module';
 
 @Module({
   imports: [
+    ScheduleModule.forRoot(),
     ConfigModule.forRoot({
       isGlobal: true,
     }),
@@ -24,7 +28,9 @@ import { CommentsModule } from './comments/comments.module';
     UserAndAdminManagementModule,
     BuildersModule,
     ProjectsModule,
-    CommentsModule
+    CommentsModule,
+    PopularityModule,
+    HomeModule,
   ],
   controllers: [AppController],
   providers: [AppService],
