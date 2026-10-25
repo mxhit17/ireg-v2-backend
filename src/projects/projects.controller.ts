@@ -37,6 +37,8 @@ import { GetProjectCommentsDto } from './dto/get-project-comments.dto';
 import { SearchProjectsDto } from './dto/search-project.dto';
 import { OptionalJwtAuthGuard } from 'src/auth/guards/optional-jwt-auth.gaurd';
 import { RecordProjectViewDto } from './dto/record-project-view.dto';
+import { CreateProjectRequestDto } from './dto/create-project-request.dto';
+import { RejectProjectRequestDto } from './dto/reject-project-request.dto';
 
 interface AuthenticatedRequest extends Request {
   user: {
@@ -58,6 +60,60 @@ export class ProjectsController {
   @HttpCode(HttpStatus.CREATED)
   createProject(@Body() dto: CreateProjectDto) {
     return this.projectsService.createProject(dto);
+  }
+
+  @Post('requests')
+  @UseGuards(JwtAuthGuard)
+  @UseInterceptors(FileInterceptor('file'))
+  @HttpCode(HttpStatus.CREATED)
+  createProjectRequest(
+    @Body() dto: CreateProjectRequestDto,
+    @Req() request: AuthenticatedRequest,
+    @UploadedFile(
+      new ParseFilePipe({
+        validators: [
+          new MaxFileSizeValidator({ maxSize: 5 * 1024 * 1024 }),
+          new FileTypeValidator({ fileType: /^image\/(jpeg|png|webp)$/ }),
+        ],
+      }),
+    )
+    file: Express.Multer.File,
+  ) {
+    return this.projectsService.createProjectRequest(request.user.id, dto, file);
+  }
+
+  @Get('requests/mine')
+  @UseGuards(JwtAuthGuard)
+  getMyProjectRequests(@Req() request: AuthenticatedRequest) {
+    return this.projectsService.getMyProjectRequests(request.user.id);
+  }
+
+  @Get('requests')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.ADMIN)
+  getPendingProjectRequests() {
+    return this.projectsService.getPendingProjectRequests();
+  }
+
+  @Post('requests/:id/approve')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.ADMIN)
+  approveProjectRequest(
+    @Param('id', new ParseUUIDPipe()) id: string,
+    @Req() request: AuthenticatedRequest,
+  ) {
+    return this.projectsService.approveProjectRequest(id, request.user.id);
+  }
+
+  @Post('requests/:id/reject')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.ADMIN)
+  rejectProjectRequest(
+    @Param('id', new ParseUUIDPipe()) id: string,
+    @Body() dto: RejectProjectRequestDto,
+    @Req() request: AuthenticatedRequest,
+  ) {
+    return this.projectsService.rejectProjectRequest(id, request.user.id, dto.reason);
   }
 
   // // GET /projects?page=1&limit=20

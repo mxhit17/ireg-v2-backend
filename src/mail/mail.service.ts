@@ -107,4 +107,59 @@ export class MailService {
 
     this.logger.log(`OTP email accepted by Resend: ${data.id}`);
   }
+
+  async sendProjectRequestDecisionEmail(
+    email: string,
+    projectName: string,
+    approved: boolean,
+    reason?: string,
+  ): Promise<void> {
+    const escapedProjectName = this.escapeHtml(projectName);
+    const escapedReason = reason ? this.escapeHtml(reason) : undefined;
+    const subject = approved
+      ? `Your project request was approved: ${projectName}`
+      : `Your project request was declined: ${projectName}`;
+    const decisionText = approved
+      ? 'Your project request has been approved and the project is now listed.'
+      : 'Your project request was not approved.';
+    const text = [
+      `Your request for “${projectName}” was ${approved ? 'approved' : 'declined'}.`,
+      ...(approved ? ['The project is now listed.'] : [`Reason: ${reason}`]),
+    ].join('\n\n');
+
+    const { data, error } = await this.resend.emails.send({
+      from: this.from,
+      to: [email],
+      subject,
+      text,
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 560px; margin: auto;">
+          <h2>Project request ${approved ? 'approved' : 'declined'}</h2>
+          <p>${decisionText}</p>
+          <p><strong>${escapedProjectName}</strong></p>
+          ${escapedReason ? `<p>Reason: ${escapedReason}</p>` : ''}
+        </div>
+      `,
+    });
+
+    if (error) {
+      this.logger.error(`Project request email failed: ${error.message}`);
+      throw new InternalServerErrorException('Failed to send project request email');
+    }
+
+    this.logger.log(`Project request email accepted by Resend: ${data.id}`);
+  }
+
+  private escapeHtml(value: string): string {
+    return value.replace(/[&<>"']/g, (character) => {
+      const escaped: Record<string, string> = {
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#39;',
+      };
+      return escaped[character];
+    });
+  }
 }

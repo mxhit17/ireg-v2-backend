@@ -15,6 +15,8 @@ import { CommentsModule } from './comments/comments.module';
 import { ScheduleModule } from '@nestjs/schedule';
 import { PopularityModule } from './popularity/popularity.module';
 import { HomeModule } from './home/home.module';
+import { KnowledgeModule } from './knowledge/knowledge.module';
+import { BlogsModule } from './blogs/blogs.module';
 
 @Module({
   imports: [
@@ -31,6 +33,8 @@ import { HomeModule } from './home/home.module';
     CommentsModule,
     PopularityModule,
     HomeModule,
+    KnowledgeModule,
+    BlogsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

@@ -20,9 +20,16 @@ import { RateProjectDto } from './dto/rate-project.dto';
 import { CreateProjectCommentDto } from './dto/create-project-comment.dto';
 import { GetProjectCommentsDto } from './dto/get-project-comments.dto';
 import { SearchProjectsDto } from './dto/search-project.dto';
+import { CreateProjectRequestDto } from './dto/create-project-request.dto';
+import { MailService } from 'src/mail/mail.service';
+import { project_request_status } from 'src/generated/prisma/enums';
 @Injectable()
 export class ProjectsService {
-  constructor(private readonly prisma: PrismaService, private readonly mediaService: MediaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly mediaService: MediaService,
+    private readonly mailService: MailService,
+  ) {}
 
   private generateSlug(name: string): string {
     return name
@@ -210,6 +217,214 @@ export class ProjectsService {
 
       throw error;
     }
+  }
+
+  async createProjectRequest(
+    requesterId: string,
+    dto: CreateProjectRequestDto,
+    file: Express.Multer.File,
+  ) {
+    const builderName = dto.builder_name.trim();
+    const name = dto.name.trim();
+    if (!builderName || !name) {
+      throw new BadRequestException('Builder name and project name are required.');
+    }
+    if (dto.min_price != null && dto.max_price != null && dto.min_price > dto.max_price) {
+      throw new BadRequestException('Minimum price cannot be greater than maximum price.');
+    }
+
+    const uploaded = await this.mediaService.uploadImage(file, 'ireg/project_requests');
+    try {
+      const request = await this.prisma.project_requests.create({
+        data: {
+          requester_id: requesterId,
+          builder_name: builderName,
+          name,
+          description: dto.description?.trim() || null,
+          project_type: dto.project_type,
+          status: dto.status,
+          location: dto.location?.trim() || null,
+          locality: dto.locality?.trim() || null,
+          city: dto.city?.trim() || null,
+          state: dto.state?.trim() || null,
+          country: dto.country === undefined ? undefined : dto.country?.trim() || null,
+          latitude: dto.latitude ?? null,
+          longitude: dto.longitude ?? null,
+          min_price: dto.min_price ?? null,
+          max_price: dto.max_price ?? null,
+          currency: dto.currency?.toUpperCase() ?? 'INR',
+          image_url: uploaded.url,
+          image_public_id: uploaded.publicId,
+        },
+      });
+
+      return { message: 'Project request submitted for admin review.', request };
+    } catch (error) {
+      await this.mediaService.deleteImage(uploaded.publicId).catch(() => undefined);
+      throw error;
+    }
+  }
+
+  async getMyProjectRequests(requesterId: string) {
+    return this.prisma.project_requests.findMany({
+      where: { requester_id: requesterId },
+      orderBy: { created_at: 'desc' },
+      select: {
+        id: true,
+        builder_name: true,
+        name: true,
+        image_url: true,
+        request_status: true,
+        rejection_reason: true,
+        project_id: true,
+        created_at: true,
+        reviewed_at: true,
+      },
+    });
+  }
+
+  async getPendingProjectRequests() {
+    return this.prisma.project_requests.findMany({
+      where: { request_status: project_request_status.PENDING },
+      orderBy: { created_at: 'asc' },
+      include: {
+        users_project_requests_requester_idTousers: {
+          select: { id: true, name: true, email: true },
+        },
+      },
+    });
+  }
+
+  async approveProjectRequest(requestId: string, reviewerId: string) {
+    const result = await this.prisma.$transaction(async (tx) => {
+      const request = await tx.project_requests.findFirst({
+        where: { id: requestId, request_status: project_request_status.PENDING },
+        include: {
+          users_project_requests_requester_idTousers: {
+            select: { email: true },
+          },
+        },
+      });
+      if (!request) throw new NotFoundException('Pending project request not found.');
+
+      const builderSlug = request.builder_name
+        .normalize('NFKD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim()
+        .replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 220).replace(/-+$/g, '');
+      if (!builderSlug) throw new BadRequestException('Builder name cannot be converted into a valid slug.');
+
+      let builder = await tx.builders.findFirst({
+        where: { slug: builderSlug, deleted_at: null },
+        select: { id: true },
+      });
+      if (!builder) {
+        builder = await tx.builders.create({
+          data: { name: request.builder_name, slug: builderSlug },
+          select: { id: true },
+        });
+      }
+
+      const duplicate = await tx.projects.findFirst({
+        where: {
+          builder_id: builder.id,
+          name: { equals: request.name, mode: 'insensitive' },
+          deleted_at: null,
+        },
+        select: { id: true },
+      });
+      if (duplicate) {
+        throw new ConflictException('This project is already listed for the builder. Reject the request with an explanation.');
+      }
+
+      const baseSlug = this.generateSlug(request.name);
+      if (!baseSlug) throw new BadRequestException('Project name cannot be converted into a valid slug.');
+      let slug = baseSlug;
+      let suffix = 1;
+      while (await tx.projects.findFirst({
+        where: { builder_id: builder.id, slug, deleted_at: null },
+        select: { id: true },
+      })) {
+        const suffixText = `-${suffix++}`;
+        slug = `${baseSlug.slice(0, 280 - suffixText.length)}${suffixText}`;
+      }
+
+      const project = await tx.projects.create({
+        data: {
+          builder_id: builder.id,
+          name: request.name,
+          slug,
+          description: request.description,
+          project_type: request.project_type,
+          status: request.status,
+          location: request.location,
+          locality: request.locality,
+          city: request.city,
+          state: request.state,
+          country: request.country,
+          latitude: request.latitude,
+          longitude: request.longitude,
+          min_price: request.min_price,
+          max_price: request.max_price,
+          currency: request.currency,
+          project_images: {
+            create: {
+              image_url: request.image_url,
+              cloudinary_public_id: request.image_public_id,
+            },
+          },
+        },
+      });
+
+      const claimed = await tx.project_requests.updateMany({
+        where: { id: request.id, request_status: project_request_status.PENDING },
+        data: {
+          request_status: project_request_status.APPROVED,
+          reviewer_id: reviewerId,
+          project_id: project.id,
+          reviewed_at: new Date(),
+        },
+      });
+      if (claimed.count !== 1) throw new ConflictException('This project request has already been reviewed.');
+
+      return { project, requesterEmail: request.users_project_requests_requester_idTousers.email, projectName: request.name };
+    });
+
+    await this.mailService.sendProjectRequestDecisionEmail(
+      result.requesterEmail,
+      result.projectName,
+      true,
+    );
+    return result.project;
+  }
+
+  async rejectProjectRequest(requestId: string, reviewerId: string, reason: string) {
+    const request = await this.prisma.project_requests.findFirst({
+      where: { id: requestId, request_status: project_request_status.PENDING },
+      include: {
+        users_project_requests_requester_idTousers: {
+          select: { email: true },
+        },
+      },
+    });
+    if (!request) throw new NotFoundException('Pending project request not found.');
+
+    const updated = await this.prisma.project_requests.updateMany({
+      where: { id: request.id, request_status: project_request_status.PENDING },
+      data: {
+        request_status: project_request_status.REJECTED,
+        rejection_reason: reason.trim(),
+        reviewer_id: reviewerId,
+        reviewed_at: new Date(),
+      },
+    });
+    if (updated.count !== 1) throw new ConflictException('This project request has already been reviewed.');
+
+    await this.mailService.sendProjectRequestDecisionEmail(
+      request.users_project_requests_requester_idTousers.email,
+      request.name,
+      false,
+      reason.trim(),
+    );
+    return { success: true, message: 'Project request rejected.' };
   }
 
   async getAllProjects(query: PaginationDto) {

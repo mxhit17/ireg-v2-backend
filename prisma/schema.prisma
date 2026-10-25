@@ -217,6 +217,40 @@ model project_images {
   @@index([project_id, display_order], map: "idx_project_images_project")
 }
 
+model project_requests {
+  id                                         String                 @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  requester_id                               String                 @db.Uuid
+  reviewer_id                                String?                @db.Uuid
+  project_id                                 String?                @db.Uuid
+  builder_name                               String                 @db.VarChar(200)
+  name                                       String                 @db.VarChar(250)
+  description                                String?
+  project_type                               project_type           @default(OTHER)
+  status                                     project_status         @default(UNKNOWN)
+  location                                   String?
+  locality                                   String?                @db.VarChar(150)
+  city                                       String?                @db.VarChar(150)
+  state                                      String?                @db.VarChar(150)
+  country                                    String?                @default("India") @db.VarChar(100)
+  latitude                                   Decimal?               @db.Decimal(10, 7)
+  longitude                                  Decimal?               @db.Decimal(10, 7)
+  min_price                                  Decimal?               @db.Decimal(15, 2)
+  max_price                                  Decimal?               @db.Decimal(15, 2)
+  currency                                   String                 @default("INR") @db.Char(3)
+  image_url                                  String
+  image_public_id                            String
+  request_status                             project_request_status @default(PENDING)
+  rejection_reason                           String?
+  created_at                                 DateTime               @default(now()) @db.Timestamptz(6)
+  reviewed_at                                DateTime?              @db.Timestamptz(6)
+  users_project_requests_requester_idTousers users                  @relation("project_requests_requester", fields: [requester_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_project_requests_requester")
+  users_project_requests_reviewer_idTousers  users?                 @relation("project_requests_reviewer", fields: [reviewer_id], references: [id], onDelete: SetNull, onUpdate: NoAction, map: "fk_project_requests_reviewer")
+  projects                                   projects?              @relation(fields: [project_id], references: [id], onDelete: SetNull, onUpdate: NoAction, map: "fk_project_requests_project")
+
+  @@index([request_status, created_at], map: "idx_project_requests_status_created")
+  @@index([requester_id, created_at(sort: Desc)], map: "idx_project_requests_requester_created")
+}
+
 /// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
 model project_ratings {
   id                 String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
@@ -265,6 +299,7 @@ model projects {
   project_view_events project_view_events[]
   builders            builders              @relation(fields: [builder_id], references: [id], onUpdate: NoAction, map: "fk_projects_builder")
   saved_projects      saved_projects[]
+  project_requests    project_requests[]
 
   @@unique([builder_id, slug], map: "uq_projects_builder_slug", where: raw("(deleted_at IS NULL)"))
   @@index([builder_id], map: "idx_projects_builder")
@@ -316,29 +351,31 @@ model user_roles {
 
 /// This model contains an expression index which requires additional setup for migrations. Visit https://pris.ly/d/expression-indexes for more info.
 model users {
-  id                                         String                  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  email                                      String                  @db.VarChar(320)
-  password_hash                              String
-  name                                       String                  @db.VarChar(150)
-  phone                                      String?                 @db.VarChar(30)
-  profile_image_url                          String?
-  is_verified                                Boolean                 @default(false)
-  status                                     user_status             @default(ACTIVE)
-  created_at                                 DateTime                @default(now()) @db.Timestamptz(6)
-  updated_at                                 DateTime                @default(now()) @db.Timestamptz(6)
-  deleted_at                                 DateTime?               @db.Timestamptz(6)
-  profile_image_public_id                    String?
-  blogs                                      blogs[]
-  comment_reactions                          comment_reactions[]
-  comments                                   comments[]
-  consultation_messages                      consultation_messages[]
-  consultations_consultations_sme_idTousers  consultations[]         @relation("consultations_sme_idTousers")
-  consultations_consultations_user_idTousers consultations[]         @relation("consultations_user_idTousers")
-  notifications                              notifications[]
-  project_ratings                            project_ratings[]
-  project_view_events                        project_view_events[]
-  saved_projects                             saved_projects[]
-  user_roles                                 user_roles[]
+  id                                                    String                  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  email                                                 String                  @db.VarChar(320)
+  password_hash                                         String
+  name                                                  String                  @db.VarChar(150)
+  phone                                                 String?                 @db.VarChar(30)
+  profile_image_url                                     String?
+  is_verified                                           Boolean                 @default(false)
+  status                                                user_status             @default(ACTIVE)
+  created_at                                            DateTime                @default(now()) @db.Timestamptz(6)
+  updated_at                                            DateTime                @default(now()) @db.Timestamptz(6)
+  deleted_at                                            DateTime?               @db.Timestamptz(6)
+  profile_image_public_id                               String?
+  blogs                                                 blogs[]
+  comment_reactions                                     comment_reactions[]
+  comments                                              comments[]
+  consultation_messages                                 consultation_messages[]
+  consultations_consultations_sme_idTousers             consultations[]         @relation("consultations_sme_idTousers")
+  consultations_consultations_user_idTousers            consultations[]         @relation("consultations_user_idTousers")
+  notifications                                         notifications[]
+  project_ratings                                       project_ratings[]
+  project_view_events                                   project_view_events[]
+  saved_projects                                        saved_projects[]
+  user_roles                                            user_roles[]
+  project_requests_project_requests_requester_idTousers project_requests[]      @relation("project_requests_requester")
+  project_requests_project_requests_reviewer_idTousers  project_requests[]      @relation("project_requests_reviewer")
 }
 
 model pending_registrations {
@@ -453,6 +490,12 @@ enum project_type {
   COMMERCIAL
   TOWNSHIP
   OTHER
+}
+
+enum project_request_status {
+  PENDING
+  APPROVED
+  REJECTED
 }
 
 enum rating_category_code {
