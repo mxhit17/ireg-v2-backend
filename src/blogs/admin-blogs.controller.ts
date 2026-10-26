@@ -1,4 +1,5 @@
-import { Body, Controller, Delete, HttpCode, HttpStatus, Param, ParseUUIDPipe, Patch, Post, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, HttpCode, HttpStatus, Param, ParseUUIDPipe, Patch, Post, Req, UploadedFile, UseGuards, UseInterceptors } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { Roles } from '../common/decorators/roles.decorator';
@@ -19,13 +20,23 @@ export class AdminBlogsController {
 
   @Post()
   @HttpCode(HttpStatus.CREATED)
-  createBlog(@Body() dto: CreateBlogDto, @Req() request: AuthenticatedRequest) {
-    return this.blogsService.createBlog(dto, request.user.id);
+  @UseInterceptors(FileInterceptor('cover_image'))
+  createBlog(
+    @Body() dto: CreateBlogDto,
+    @Req() request: AuthenticatedRequest,
+    @UploadedFile() file?: Express.Multer.File,
+  ) {
+    return this.blogsService.createBlog(dto, request.user.id, file);
   }
 
   @Patch(':id')
-  updateBlog(@Param('id', new ParseUUIDPipe()) id: string, @Body() dto: UpdateBlogDto) {
-    return this.blogsService.updateBlog(id, dto);
+  @UseInterceptors(FileInterceptor('cover_image'))
+  updateBlog(
+    @Param('id', new ParseUUIDPipe()) id: string,
+    @Body() dto: UpdateBlogDto,
+    @UploadedFile() file?: Express.Multer.File,
+  ) {
+    return this.blogsService.updateBlog(id, dto, file);
   }
 
   @Post(':id/publish')

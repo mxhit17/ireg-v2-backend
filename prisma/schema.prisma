@@ -9,21 +9,22 @@ datasource db {
 }
 
 model blogs {
-  id              String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  author_id       String         @db.Uuid
-  title           String         @db.VarChar(300)
-  slug            String         @unique @db.VarChar(330)
-  excerpt         String?
-  body            String
-  cover_image_url String?
-  source_name     String?        @db.VarChar(200)
-  source_url      String?
-  status          content_status @default(DRAFT)
-  published_at    DateTime?      @db.Timestamptz(6)
-  created_at      DateTime       @default(now()) @db.Timestamptz(6)
-  updated_at      DateTime       @default(now()) @db.Timestamptz(6)
-  deleted_at      DateTime?      @db.Timestamptz(6)
-  users           users          @relation(fields: [author_id], references: [id], onUpdate: NoAction, map: "fk_blogs_author")
+  id                    String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  author_id             String         @db.Uuid
+  title                 String         @db.VarChar(300)
+  slug                  String         @unique @db.VarChar(330)
+  excerpt               String?
+  body                  String
+  cover_image_url       String?
+  source_name           String?        @db.VarChar(200)
+  source_url            String?
+  status                content_status @default(DRAFT)
+  published_at          DateTime?      @db.Timestamptz(6)
+  created_at            DateTime       @default(now()) @db.Timestamptz(6)
+  updated_at            DateTime       @default(now()) @db.Timestamptz(6)
+  deleted_at            DateTime?      @db.Timestamptz(6)
+  cover_image_public_id String?        @db.VarChar(500)
+  users                 users          @relation(fields: [author_id], references: [id], onUpdate: NoAction, map: "fk_blogs_author")
 
   @@index([author_id], map: "idx_blogs_author")
   @@index([status, published_at(sort: Desc)], map: "idx_blogs_status_published")
@@ -243,9 +244,9 @@ model project_requests {
   rejection_reason                           String?
   created_at                                 DateTime               @default(now()) @db.Timestamptz(6)
   reviewed_at                                DateTime?              @db.Timestamptz(6)
+  projects                                   projects?              @relation(fields: [project_id], references: [id], onUpdate: NoAction, map: "fk_project_requests_project")
   users_project_requests_requester_idTousers users                  @relation("project_requests_requester", fields: [requester_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_project_requests_requester")
-  users_project_requests_reviewer_idTousers  users?                 @relation("project_requests_reviewer", fields: [reviewer_id], references: [id], onDelete: SetNull, onUpdate: NoAction, map: "fk_project_requests_reviewer")
-  projects                                   projects?              @relation(fields: [project_id], references: [id], onDelete: SetNull, onUpdate: NoAction, map: "fk_project_requests_project")
+  users_project_requests_reviewer_idTousers  users?                 @relation("project_requests_reviewer", fields: [reviewer_id], references: [id], onUpdate: NoAction, map: "fk_project_requests_reviewer")
 
   @@index([request_status, created_at], map: "idx_project_requests_status_created")
   @@index([requester_id, created_at(sort: Desc)], map: "idx_project_requests_requester_created")
@@ -295,11 +296,11 @@ model projects {
   comments            comments[]
   project_images      project_images[]
   project_ratings     project_ratings[]
+  project_requests    project_requests[]
   project_stats       project_stats?
   project_view_events project_view_events[]
   builders            builders              @relation(fields: [builder_id], references: [id], onUpdate: NoAction, map: "fk_projects_builder")
   saved_projects      saved_projects[]
-  project_requests    project_requests[]
 
   @@unique([builder_id, slug], map: "uq_projects_builder_slug", where: raw("(deleted_at IS NULL)"))
   @@index([builder_id], map: "idx_projects_builder")
@@ -371,11 +372,11 @@ model users {
   consultations_consultations_user_idTousers            consultations[]         @relation("consultations_user_idTousers")
   notifications                                         notifications[]
   project_ratings                                       project_ratings[]
+  project_requests_project_requests_requester_idTousers project_requests[]      @relation("project_requests_requester")
+  project_requests_project_requests_reviewer_idTousers  project_requests[]      @relation("project_requests_reviewer")
   project_view_events                                   project_view_events[]
   saved_projects                                        saved_projects[]
   user_roles                                            user_roles[]
-  project_requests_project_requests_requester_idTousers project_requests[]      @relation("project_requests_requester")
-  project_requests_project_requests_reviewer_idTousers  project_requests[]      @relation("project_requests_reviewer")
 }
 
 model pending_registrations {
@@ -410,6 +411,7 @@ model project_stats {
   popularity_score        Decimal  @default(0) @db.Decimal(5, 2)
   trending_score          Decimal  @default(0) @db.Decimal(5, 2)
   calculated_at           DateTime @default(now()) @db.Timestamptz(6)
+  engagement_previous_7d  Decimal  @default(0) @db.Decimal(14, 2)
   projects                projects @relation(fields: [project_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
 
   @@index([popularity_score(sort: Desc), project_id], map: "idx_project_stats_popularity")
