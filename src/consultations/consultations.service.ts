@@ -170,7 +170,7 @@ export class ConsultationsService {
           customerId: consultation.user_id,
           customerName: customer.name,
           customerEmail: customer.email,
-          customerPhone: customer.phone,
+          customerPhone: normalizeIndianPhone(customer.phone),
           returnUrl: effectiveReturnUrl.toString(),
           notifyUrl: this.config.get<string>('CASHFREE_WEBHOOK_URL'),
         });
@@ -220,6 +220,8 @@ export class ConsultationsService {
       environment: this.cashfree.getEnvironment(),
     };
   }
+
+  
 
   async getPaymentStatus(id: string, userId: string, roles: string[]) {
     const consultation = await this.getConsultation(id, userId, roles);
@@ -501,4 +503,12 @@ export class ConsultationsService {
       },
     });
   }
+}
+
+function normalizeIndianPhone(raw?: string | null): string | null {
+  if (!raw) return null;
+  let digits = raw.replace(/\D/g, '');
+  if (digits.length === 12 && digits.startsWith('91')) digits = digits.slice(2);
+  if (digits.length === 11 && digits.startsWith('0')) digits = digits.slice(1);
+  return /^[6-9]\d{9}$/.test(digits) ? digits : null;
 }
