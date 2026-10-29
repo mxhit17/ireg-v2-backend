@@ -13,6 +13,7 @@ import { CashfreeService } from './cashfree.service';
 import { CreateConsultationDto } from './dto/create-consultation.dto';
 import { CreateMessageDto } from './dto/create-message.dto';
 import { ListMessagesDto } from './dto/list-messages.dto';
+import { createHash } from 'crypto';
 
 const consultationInclude = {
   consultation_services: true,
@@ -162,12 +163,24 @@ export class ConsultationsService {
           suppliedReturnUrl?.toString() ?? checkoutUrl.toString(),
         );
         effectiveReturnUrl.searchParams.set('consultation_id', consultation.id);
+        const orderInput = {
+          orderId,
+          amount: Number(Number(consultation.amount).toFixed(2)),
+          currency: consultation.currency.trim().toUpperCase(),
+          customerId: consultation.user_id.replaceAll('-', ''), // 32 alphanumeric chars
+          customerName: customer.name,
+          customerEmail: customer.email,
+          customerPhone: normalizeIndianPhone(customer.phone),
+          returnUrl: effectiveReturnUrl.toString(),
+          notifyUrl: this.config.get<string>('CASHFREE_WEBHOOK_URL'),
+        };
         order = await this.cashfree.createOrder({
           orderId,
-          idempotencyKey: consultation.id,
+          // idempotencyKey: consultation.id,
+          idempotencyKey: idempotencyKeyFor(orderInput),
           amount: Number(consultation.amount.toFixed(2)),
           currency: consultation.currency.trim(),
-          customerId: consultation.user_id,
+          customerId: consultation.user_id.replaceAll('-', ''),
           customerName: customer.name,
           customerEmail: customer.email,
           customerPhone: normalizeIndianPhone(customer.phone),
@@ -511,4 +524,9 @@ function normalizeIndianPhone(raw?: string | null): string | null {
   if (digits.length === 12 && digits.startsWith('91')) digits = digits.slice(2);
   if (digits.length === 11 && digits.startsWith('0')) digits = digits.slice(1);
   return /^[6-9]\d{9}$/.test(digits) ? digits : null;
+}
+
+function idempotencyKeyFor(payload: unknown): string {
+  const h = createHash('sha256').update(JSON.stringify(payload)).digest('hex');
+  return `${h.slice(0, 8)}-${h.slice(8, 12)}-${h.slice(12, 16)}-${h.slice(16, 20)}-${h.slice(20, 32)}`;
 }
