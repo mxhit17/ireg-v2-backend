@@ -126,6 +126,10 @@ model consultations {
   started_at                         DateTime?               @db.Timestamptz(6)
   expires_at                         DateTime?               @db.Timestamptz(6)
   completed_at                       DateTime?               @db.Timestamptz(6)
+  cashfree_order_id                  String?                 @unique @db.VarChar(45)
+  cashfree_payment_session_id        String?
+  cashfree_payment_id                 String?                 @db.VarChar(100)
+  payment_verified_at                 DateTime?               @db.Timestamptz(6)
   created_at                         DateTime                @default(now()) @db.Timestamptz(6)
   updated_at                         DateTime                @default(now()) @db.Timestamptz(6)
   consultation_messages              consultation_messages[]

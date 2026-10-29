@@ -1,0 +1,101 @@
+openapi: 3.0.3
+info:
+  title: Cashfree PG API subset used by IREG
+  version: 2026-01-01
+servers:
+  - url: https://sandbox.cashfree.com/pg
+paths:
+  /orders:
+    post:
+      operationId: createOrder
+      summary: Create a Cashfree payment order
+      parameters:
+        - in: header
+          name: x-api-version
+          required: true
+          schema: { type: string, example: 2026-01-01 }
+        - in: header
+          name: x-client-id
+          required: true
+          schema: { type: string }
+        - in: header
+          name: x-client-secret
+          required: true
+          schema: { type: string }
+        - in: header
+          name: x-idempotency-key
+          required: false
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                [order_id, order_amount, order_currency, customer_details]
+              properties:
+                order_id: { type: string, minLength: 3, maxLength: 45 }
+                order_amount: { type: number, minimum: 1 }
+                order_currency: { type: string, example: INR }
+                customer_details:
+                  type: object
+                  required:
+                    [customer_id, customer_name, customer_email, customer_phone]
+                  properties:
+                    customer_id: { type: string }
+                    customer_name: { type: string }
+                    customer_email: { type: string, format: email }
+                    customer_phone: { type: string }
+                order_meta:
+                  type: object
+                  properties:
+                    return_url: { type: string, format: uri }
+                    notify_url: { type: string, format: uri }
+      responses:
+        '200':
+          description: Order created
+          content:
+            application/json:
+              example:
+                order_id: ireg_mockorder
+                order_amount: 1250
+                order_currency: INR
+                order_status: ACTIVE
+                payment_session_id: session_sandbox_mock
+        '400': { description: Invalid order request }
+        '401': { description: Invalid credentials }
+        '409': { description: Duplicate order ID }
+  /orders/{order_id}:
+    get:
+      operationId: getOrder
+      summary: Fetch a Cashfree order
+      parameters:
+        - in: path
+          name: order_id
+          required: true
+          schema: { type: string }
+        - in: header
+          name: x-api-version
+          required: true
+          schema: { type: string, example: 2026-01-01 }
+        - in: header
+          name: x-client-id
+          required: true
+          schema: { type: string }
+        - in: header
+          name: x-client-secret
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Order details
+          content:
+            application/json:
+              example:
+                order_id: ireg_mockorder
+                order_amount: 1250
+                order_currency: INR
+                order_status: ACTIVE
+                payment_session_id: session_sandbox_mock
+        '404': { description: Order not found }

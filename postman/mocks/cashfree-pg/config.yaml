@@ -1,0 +1,12 @@
+version: 1
+id: 915d653a-2b9c-430e-a5eb-b38855380167
+name: Cashfree PG API subset used by IREG
+slug: cashfree-pg-api-subset-used-by-i
+protocol: http
+port: 4517
+origin: sandbox.cashfree.com
+interceptRequests: true
+scenarios:
+  - name: default
+    path: ./default.js
+    default: true

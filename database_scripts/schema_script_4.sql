@@ -363,5 +363,5 @@ AS $$
         recent_engagement_score = EXCLUDED.recent_engagement_score,
         popularity_score = EXCLUDED.popularity_score,
         trending_score = EXCLUDED.trending_score,
-        calculated_at = NOW()
+        calculated_at = NOW();
 $$;

@@ -17,6 +17,7 @@ import { PopularityModule } from './popularity/popularity.module';
 import { HomeModule } from './home/home.module';
 import { KnowledgeModule } from './knowledge/knowledge.module';
 import { BlogsModule } from './blogs/blogs.module';
+import { ConsultationsModule } from './consultations/consultations.module';
 
 @Module({
   imports: [
@@ -35,6 +36,7 @@ import { BlogsModule } from './blogs/blogs.module';
     HomeModule,
     KnowledgeModule,
     BlogsModule,
+    ConsultationsModule,
   ],
   controllers: [AppController],
   providers: [AppService],
