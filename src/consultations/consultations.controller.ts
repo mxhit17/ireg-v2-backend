@@ -20,6 +20,7 @@ import { CreateMessageDto } from './dto/create-message.dto';
 import { AssignConsultationDto } from './dto/assign-consultation.dto';
 import { ListMessagesDto } from './dto/list-messages.dto';
 import { InitiatePaymentDto } from './dto/initiate-payment.dto';
+import { PaginationDto } from 'src/common/pagination/pagination.dto';
 
 interface AuthenticatedRequest extends Request {
   user: { id: string; email: string; roles: string[] };
@@ -60,6 +61,47 @@ export class ConsultationsController {
   @UseGuards(JwtAuthGuard)
   listMine(@Req() req: AuthenticatedRequest) {
     return this.consultations.listMine(req.user.id);
+  }
+
+  @Get('admin/consultations')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.ADMIN)
+  listPaidIncomplete(@Query() query: PaginationDto) {
+    return this.consultations.listPaidIncomplete(query);
+  }
+
+  @Get('admin/consultations/completed')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.ADMIN)
+  listCompleted(@Query() query: PaginationDto) {
+    return this.consultations.listCompleted(query);
+  }
+
+  @Get('admin/consultations/smes')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.ADMIN)
+  listSmes(@Query() query: PaginationDto) {
+    return this.consultations.listSmes(query);
+  }
+
+  @Get('sme/consultations/ongoing')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.SME)
+  listMyOngoingConsultations(
+    @Query() query: PaginationDto,
+    @Req() req: AuthenticatedRequest,
+  ) {
+    return this.consultations.listMyOngoingConsultations(req.user.id, query);
+  }
+
+  @Get('sme/consultations/completed')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.SME)
+  listMyCompletedConsultations(
+    @Query() query: PaginationDto,
+    @Req() req: AuthenticatedRequest,
+  ) {
+    return this.consultations.listMyCompletedConsultations(req.user.id, query);
   }
 
   @Get('consultations/:id')

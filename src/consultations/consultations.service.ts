@@ -14,6 +14,8 @@ import { CreateConsultationDto } from './dto/create-consultation.dto';
 import { CreateMessageDto } from './dto/create-message.dto';
 import { ListMessagesDto } from './dto/list-messages.dto';
 import { createHash } from 'crypto';
+import { PaginationDto } from 'src/common/pagination/pagination.dto';
+import { paginate } from 'src/common/pagination/pagination.util';
 
 const consultationInclude = {
   consultation_services: true,
@@ -72,6 +74,120 @@ export class ConsultationsService {
       where: { user_id: userId },
       include: consultationInclude,
       orderBy: { created_at: 'desc' },
+    });
+  }
+
+  listPaidIncomplete(query: PaginationDto) {
+    const where = {
+      status: {
+        in: [
+          consultation_status.PAID,
+          consultation_status.ASSIGNED,
+          consultation_status.ONGOING,
+        ],
+      },
+    };
+
+    return paginate({
+      page: query.page,
+      limit: query.limit,
+      findMany: (skip, take) =>
+        this.prisma.consultations.findMany({
+          where,
+          include: consultationInclude,
+          orderBy: [{ created_at: 'desc' }, { id: 'desc' }],
+          skip,
+          take,
+        }),
+      count: () => this.prisma.consultations.count({ where }),
+    });
+  }
+
+  listCompleted(query: PaginationDto) {
+    const where = { status: consultation_status.COMPLETED };
+
+    return paginate({
+      page: query.page,
+      limit: query.limit,
+      findMany: (skip, take) =>
+        this.prisma.consultations.findMany({
+          where,
+          include: consultationInclude,
+          orderBy: [{ completed_at: 'desc' }, { id: 'desc' }],
+          skip,
+          take,
+        }),
+      count: () => this.prisma.consultations.count({ where }),
+    });
+  }
+
+  listMyOngoingConsultations(smeId: string, query: PaginationDto) {
+    const where = {
+      sme_id: smeId,
+      status: consultation_status.ONGOING,
+    };
+
+    return paginate({
+      page: query.page,
+      limit: query.limit,
+      findMany: (skip, take) =>
+        this.prisma.consultations.findMany({
+          where,
+          include: consultationInclude,
+          orderBy: [{ started_at: 'desc' }, { id: 'desc' }],
+          skip,
+          take,
+        }),
+      count: () => this.prisma.consultations.count({ where }),
+    });
+  }
+
+  listMyCompletedConsultations(smeId: string, query: PaginationDto) {
+    const where = {
+      sme_id: smeId,
+      status: consultation_status.COMPLETED,
+    };
+
+    return paginate({
+      page: query.page,
+      limit: query.limit,
+      findMany: (skip, take) =>
+        this.prisma.consultations.findMany({
+          where,
+          include: consultationInclude,
+          orderBy: [{ completed_at: 'desc' }, { id: 'desc' }],
+          skip,
+          take,
+        }),
+      count: () => this.prisma.consultations.count({ where }),
+    });
+  }
+
+  listSmes(query: PaginationDto) {
+    const where = {
+      deleted_at: null,
+      status: 'ACTIVE' as const,
+      user_roles: { some: { roles: { name: 'SME' } } },
+    };
+
+    return paginate({
+      page: query.page,
+      limit: query.limit,
+      findMany: (skip, take) =>
+        this.prisma.users.findMany({
+          where,
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            phone: true,
+            profile_image_url: true,
+          },
+          orderBy: [{ name: 'asc' }, { id: 'asc' }],
+          skip,
+          take,
+        }),
+      count: () => this.prisma.users.count({ where }),
     });
   }
 
