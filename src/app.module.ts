@@ -18,6 +18,7 @@ import { HomeModule } from './home/home.module';
 import { KnowledgeModule } from './knowledge/knowledge.module';
 import { BlogsModule } from './blogs/blogs.module';
 import { ConsultationsModule } from './consultations/consultations.module';
+import { FeedbackModule } from './feedback/feedback.module';
 
 @Module({
   imports: [
@@ -37,6 +38,7 @@ import { ConsultationsModule } from './consultations/consultations.module';
     KnowledgeModule,
     BlogsModule,
     ConsultationsModule,
+    FeedbackModule,
   ],
   controllers: [AppController],
   providers: [AppService],
