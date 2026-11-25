@@ -123,7 +123,6 @@ export class ProjectsController {
   //   return this.projectsService.getAllProjects(query);
   // }
 
-  // GET /projects/:id
   @Post(':id/ratings')
   @UseGuards(JwtAuthGuard)
   @HttpCode(HttpStatus.OK)

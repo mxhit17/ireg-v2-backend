@@ -43,7 +43,7 @@ CREATE TYPE rating_category_code AS ENUM (
     'AMENITIES_FACILITIES',
     'SURROUNDING_ENVIRONMENT',
     'CONSTRUCTION_QUALITY',
-    'BUILDER'
+    'SIZE_LAYOUTS'
 );
 
 CREATE TYPE comment_reaction_type AS ENUM (
@@ -895,9 +895,9 @@ VALUES
         4
     ),
     (
-        'BUILDER',
-        'Builder',
-        'Rating for the builder/developer.',
+        'SIZE_LAYOUTS',
+        'Size & Layouts',
+        'Rating for sizes and layouts.',
         5
     )
 ON CONFLICT (code) DO NOTHING;

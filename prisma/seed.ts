@@ -7,7 +7,7 @@
  * blogs, consultation services, consultations with chat threads, project
  * submission requests, notifications and pending registrations.
  *
- *   npx prisma db seed            (uses `migrations.seed` in prisma.config.ts)
+ *   npx prisma db seed            (uses `migrations.seed` in prisma.config.ts).     SEED_ALLOW_REMOTE=true npx prisma db seed
  *   npx tsx prisma/seed.ts        (direct)
  *
  * ⚠️  It TRUNCATES EVERY TABLE first, so it is safe to re-run but destroys data.
@@ -250,8 +250,8 @@ const RATING_CATEGORIES = [
     description: "Greenery, air and noise levels, cleanliness and neighbourhood feel." },
   { code: "CONSTRUCTION_QUALITY", name: "Construction Quality",
     description: "Materials, finishing, workmanship and structural soundness." },
-  { code: "BUILDER", name: "Builder",
-    description: "Track record, delivery timelines, transparency and after-sales support." },
+  { code: "SIZE_LAYOUTS", name: "Size & Layouts",
+    description: "Rating for sizes and layouts." },
 ] as const;
 
 const TOP_COMMENTS = [

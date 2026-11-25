@@ -509,7 +509,7 @@ enum rating_category_code {
   AMENITIES_FACILITIES
   SURROUNDING_ENVIRONMENT
   CONSTRUCTION_QUALITY
-  BUILDER
+  SIZE_LAYOUTS
 }
 
 enum user_status {

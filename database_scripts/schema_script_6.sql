@@ -54,3 +54,6 @@ ADD COLUMN IF NOT EXISTS cashfree_order_id VARCHAR(45) UNIQUE,
 ADD COLUMN IF NOT EXISTS cashfree_payment_session_id TEXT,
 ADD COLUMN IF NOT EXISTS cashfree_payment_id VARCHAR(100),
 ADD COLUMN IF NOT EXISTS payment_verified_at TIMESTAMPTZ(6);
+
+alter table builders 
+add column if not exists cloudinary_public_id varchar(255);

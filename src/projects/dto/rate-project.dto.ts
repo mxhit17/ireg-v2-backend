@@ -30,5 +30,5 @@ export class RateProjectDto {
   @IsNumber({ maxDecimalPlaces: 1 })
   @Min(0)
   @Max(5)
-  BUILDER!: number;
+  SIZE_LAYOUTS!: number;
 }
